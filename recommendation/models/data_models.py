@@ -29,62 +29,37 @@ class UserProfile:
     interests_categories: List[str] = field(default_factory=list)
     bookmarked_paper_ids: List[str] = field(default_factory=list)
     search_queries: List[str] = field(default_factory=list)
+    explicit_categories: Optional[List[str]] = None
+
 
 
 @dataclass
 class RecommendationResult:
     paper: Paper
     score: float
-    features: Dict[str, float] = field(default_factory=dict)
+    features: Dict[str, float]
 
-    def to_dict(self) -> Dict[str, Any]:
-        """프론트 요구사항 기반 JSON 포맷"""
+    def to_frontend_dict(self) -> Dict[str, Any]:
+        """
+        프론트엔드 요구사항에 맞춘 응답 포맷으로 변환.
 
-        paper = self.paper
-
-        # year
-        year = paper.update_date.year if paper.update_date else None
-
-        # translated summary
-        translated_summary = None
-        if isinstance(paper.summary, dict):
-            translated_summary = (
-                paper.summary.get("ko")
-                or paper.summary.get("translated")
-                or paper.summary.get("kr")
-            )
-
-        # external URL
-        external_url = None
-        if paper.arxiv_id:
-            external_url = f"https://arxiv.org/pdf/{paper.arxiv_id}.pdf"
-
-        # summary 또는 abstract 일부
-        summary_text = None
-        if isinstance(paper.summary, dict):
-            summary_text = (
-                paper.summary.get("en")
-                or paper.summary.get("summary")
-                or paper.summary.get("abstract")
-            )
-        if not summary_text:
-            summary_text = (paper.abstract[:300] + "...") if paper.abstract else None
-
+        - id: 논문 ID (arxiv_id 우선, 없으면 mongo_id)
+        - title, authors, abstract, categories
+        - summary: 요약(영어/한글 중 하나, 실제 구현에 따라 조정 가능)
+        - externalUrl: arXiv 원문 링크 (가능한 경우)
+        - score: 추천 점수
+        - features: 서브 스코어(카테고리, 키워드, 인기도, 최신성 등)
+        """
+        paper_id = self.paper.arxiv_id or self.paper.mongo_id
         return {
-            "id": paper.arxiv_id,
-            "mongo_id": paper.mongo_id,
-            "title": paper.title,
-            "authors": paper.authors,
-            "year": year,
-            "publisher": "",
-            "categories": paper.categories,
-            "abstract": paper.abstract,
-            "translatedSummary": translated_summary,
-            "keywords": paper.keywords,
-            "externalUrl": external_url,
-
-            # 추천용
-            "summary": summary_text,
+            "id": paper_id,
+            "title": self.paper.title,
+            "authors": self.paper.authors,
+            "abstract": self.paper.abstract,
+            "categories": self.paper.categories,
+            # summary 구조는 프로젝트 사양에 맞게 조정 가능
+            "summary": self.paper.summary,
+            "externalUrl": f"https://arxiv.org/abs/{paper_id}" if self.paper.arxiv_id else None,
             "score": self.score,
             "features": self.features,
         }

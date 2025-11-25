@@ -18,9 +18,8 @@ def _get_recommender() -> RuleBasedRecommender:
 
 def recommend_user(user_id: int, top_k: int = 6) -> List[Dict[str, Any]]:
     rec = _get_recommender().recommend_for_user(user_id, top_k)
-    return [r.to_dict() for r in rec]
-
+    return [r.to_frontend_dict() for r in rec]
 
 def recommend_similar_papers(paper_id: str, top_k: int = 6):
     rec = _get_recommender().recommend_similar_papers(paper_id, top_k)
-    return [r.to_dict() for r in rec]
+    return [r.to_frontend_dict() for r in rec]
