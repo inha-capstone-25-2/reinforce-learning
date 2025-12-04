@@ -7,7 +7,6 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 
 
-# NOTE: 실제 운영에서는 환경변수/시크릿으로 관리 권장
 PG_HOST = os.getenv("PG_HOST", "35.94.93.225")
 PG_PORT = int(os.getenv("PG_PORT", "5432"))
 PG_DBNAME = os.getenv("PG_DBNAME", "rsrs")

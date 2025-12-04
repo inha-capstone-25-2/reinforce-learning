@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 import os
 from datetime import datetime
 from typing import Iterable, List, Optional, Dict, Any
@@ -9,11 +8,12 @@ from pymongo import MongoClient, DESCENDING
 
 from ..models.data_models import Paper, UserProfile
 from .preprocess import tokenize_keywords
-from .postgres_loader import PostgresUserInterestLoader
 
 
-# NOTE: 실제 환경에서는 .env로 관리 권장
-MONGODB_HOST = "35.87.92.19"
+# -----------------------------------------
+#  SSH 터널링을 사용하므로 host=localhost 로 접속됨
+# -----------------------------------------
+MONGODB_HOST = "localhost"
 MONGODB_PORT = 27017
 MONGODB_USERNAME = "rsrs-root"
 MONGODB_PASSWORD = "KIQu3jebjHNhTEE6mm5tgj2oNjYr7J805k2JLbE0AVo"
@@ -22,38 +22,29 @@ MONGODB_DB_NAME = "arxiv"
 
 class MongoDataLoader:
     """
-    MongoDB + PostgreSQL 기반 UserProfile 생성 로더.
-    - MongoDB: papers, bookmarks, search_history
-    - PostgreSQL: user_interests → explicit_categories
+    MongoDB 기반 UserProfile + Paper 로딩 클래스
     """
 
-    def __init__(
-        self,
-        client: Optional[MongoClient] = None,
-        db_name: str = None,
-        pg_loader: Optional[PostgresUserInterestLoader] = None,
-    ):
-        # ----- MongoDB 연결 -----
+    def __init__(self, client: Optional[MongoClient] = None, db_name: str = None):
+        # -----------------------------
+        # 실제 MongoDB 연결 (SSH 포트포워딩 기반)
+        # -----------------------------
         if client is None:
-            if MONGODB_USERNAME and MONGODB_PASSWORD:
-                uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}"
-            else:
-                uri = f"mongodb://{MONGODB_HOST}:{MONGODB_PORT}"
+            uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@{MONGODB_HOST}:{MONGODB_PORT}"
             client = MongoClient(uri)
 
         self.client = client
         self.db = self.client[db_name or MONGODB_DB_NAME]
 
+        # Collections
         self.col_papers = self.db["papers"]
         self.col_bookmarks = self.db["bookmarks"]
         self.col_search_history = self.db["search_history"]
         self.col_user_activities = self.db["user_activities"]
 
-        # ----- PostgreSQL User Interests Loader -----
-        self.pg_loader = pg_loader or PostgresUserInterestLoader()
-
-    # -------------- Paper Parsing -----------------
-
+    # ------------------------------------------------------
+    # Paper Document → Paper dataclass 변환
+    # ------------------------------------------------------
     @staticmethod
     def _parse_datetime(value: Any) -> Optional[datetime]:
         if isinstance(value, datetime):
@@ -69,15 +60,13 @@ class MongoDataLoader:
     def _doc_to_paper(doc: Dict[str, Any]) -> Paper:
         return Paper(
             mongo_id=str(doc["_id"]),
-            arxiv_id=doc.get("id") or doc.get("arvix_id"),
+            arxiv_id=doc.get("id"),  # ★ 실제 DB는 arXiv ID 문자열
             title=doc.get("title"),
             abstract=doc.get("abstract"),
             authors=doc.get("authors"),
             categories=list(doc.get("categories") or []),
             keywords=list(doc.get("keywords") or []),
-            update_date=MongoDataLoader._parse_datetime(
-                doc.get("update_date") or doc.get("published_date")
-            ),
+            update_date=MongoDataLoader._parse_datetime(doc.get("update_date")),
             bookmark_count=int(doc.get("bookmark_count") or 0),
             view_count=int(doc.get("view_count") or 0),
             difficulty_level=doc.get("difficulty_level"),
@@ -85,42 +74,36 @@ class MongoDataLoader:
             embedding_vector=doc.get("embedding_vector"),
         )
 
-    # -------------- Papers 조회 -----------------
-
+    # ------------------------------------------------------
+    # PAPER 조회 관련
+    # ------------------------------------------------------
     def get_paper_by_arxiv_id(self, arxiv_id: str) -> Optional[Paper]:
-        doc = self.col_papers.find_one({"id": arxiv_id}) or \
-              self.col_papers.find_one({"arvix_id": arxiv_id})
+        doc = self.col_papers.find_one({"id": arxiv_id})
         return self._doc_to_paper(doc) if doc else None
 
-    def get_papers_by_mongo_ids(self, mongo_ids: Iterable[str]) -> List[Paper]:
-        oids = [ObjectId(mid) for mid in mongo_ids if ObjectId.is_valid(mid)]
-        if not oids:
-            return []
-        cursor = self.col_papers.find({"_id": {"$in": oids}})
+    def get_recent_papers(self, limit: int = 200):
+        cursor = self.col_papers.find().sort("update_date", DESCENDING).limit(limit)
         return [self._doc_to_paper(d) for d in cursor]
 
-    def get_recent_papers(self, limit: int = 200) -> List[Paper]:
-        cursor = self.col_papers.find().sort(
-            [("update_date", DESCENDING)]
-        ).limit(limit)
-        return [self._doc_to_paper(d) for d in cursor]
-
-    def get_papers_by_categories(self, categories: Iterable[str], limit: int = 300):
+    def get_papers_by_categories(self, categories: Iterable[str], limit=300):
         cursor = self.col_papers.find({"categories": {"$in": list(categories)}})\
-            .sort([("update_date", DESCENDING)]).limit(limit)
+                                .sort("update_date", DESCENDING)\
+                                .limit(limit)
         return [self._doc_to_paper(d) for d in cursor]
 
-    # -------------- User Data (MongoDB) -----------------
-
+    # ------------------------------------------------------
+    # USER DATA 조회
+    # ------------------------------------------------------
     def get_user_bookmarked_paper_ids(self, user_id: int) -> List[str]:
         cursor = self.col_bookmarks.find({"users_id": user_id})
-        return [
-            str(d["paper_id"])
-            for d in cursor
-            if isinstance(d.get("paper_id"), ObjectId)
-        ]
+        result = []
+        for d in cursor:
+            pid = d.get("paper_id")
+            if isinstance(pid, str):
+                result.append(pid)
+        return result
 
-    def get_user_search_queries(self, user_id: int, limit: int = 20) -> List[str]:
+    def get_user_search_queries(self, user_id: int, limit: int = 20):
         cursor = (
             self.col_search_history.find({"users_id": user_id})
             .sort("searched_at", DESCENDING)
@@ -128,75 +111,55 @@ class MongoDataLoader:
         )
         return [d.get("query") for d in cursor if d.get("query")]
 
-    # -------------- PostgreSQL User Interests -----------------
-
-    def _get_explicit_categories_from_postgres(self, user_id: int) -> List[str]:
-        """
-        PostgreSQL의 user_interests + categories.code 로부터
-        '사용자 지정 관심 카테고리(explicit categories)' 추출.
-        """
-        try:
-            return self.pg_loader.get_user_category_codes(user_id)
-        except Exception as e:
-            print(f"[WARN] Failed to load user interests from PostgreSQL: {e}")
-            return []
-
-    # -------------- User Profile Build -----------------
-
+    # ------------------------------------------------------
+    # USER PROFILE 구성
+    # ------------------------------------------------------
     def build_user_profile(self, user_id: int) -> UserProfile:
-        """
-        UserProfile 구성:
-        - explicit_categories:
-            PostgreSQL user_interests 기반 (가장 강한 신호)
-        - bookmark 기반 카테고리
-        - search history 기반 키워드
-        """
-
-        # 1) PostgreSQL 관심사
-        explicit_categories = self._get_explicit_categories_from_postgres(user_id)
-
-        # 2) MongoDB 북마크 기반 카테고리 + 키워드
+        # 북마크 기반
         bookmarked_ids = self.get_user_bookmarked_paper_ids(user_id)
-        bookmarked_papers = self.get_papers_by_mongo_ids(bookmarked_ids)
+        bookmarked_papers = [
+            self.get_paper_by_arxiv_id(pid) for pid in bookmarked_ids
+        ]
+        bookmarked_papers = [p for p in bookmarked_papers if p]
 
-        cats = []
-        kws = []
+        categories = []
+        keywords = []
 
         for p in bookmarked_papers:
-            cats.extend(p.categories)
-            kws.extend(p.keywords)
+            categories.extend(p.categories)
+            keywords.extend(p.keywords)
 
-        # 3) 검색 기록 기반 키워드
+        # 검색 기반 키워드
         search_queries = self.get_user_search_queries(user_id)
         for q in search_queries:
-            kws.extend(tokenize_keywords(q))
-
-        # 4) explicit categories 도 interests_categories 에 포함
-        if explicit_categories:
-            cats.extend(explicit_categories)
+            keywords.extend(tokenize_keywords(q))
 
         return UserProfile(
             user_id=user_id,
-            interests_categories=sorted(set(cats)),
-            interests_keywords=sorted(set(kws)),
+            interests_categories=sorted(set(categories)),
+            interests_keywords=sorted(set(keywords)),
             bookmarked_paper_ids=bookmarked_ids,
             search_queries=search_queries,
-            explicit_categories=sorted(set(explicit_categories)) or None,
+            explicit_categories=None,
         )
 
-    # -------------- Candidate Selection -----------------
-
+    # ------------------------------------------------------
+    # Candidate 생성
+    # ------------------------------------------------------
     def get_candidate_papers_for_user(self, profile: UserProfile, limit_per_source=200):
         candidates = {}
 
+        # 관심 카테고리 기반
         if profile.interests_categories:
             for p in self.get_papers_by_categories(profile.interests_categories, limit_per_source):
-                candidates[p.mongo_id] = p
+                candidates[p.arxiv_id] = p
 
+        # 최신 기반 추가
         for p in self.get_recent_papers(limit_per_source):
-            candidates.setdefault(p.mongo_id, p)
+            candidates.setdefault(p.arxiv_id, p)
 
-        for mid in profile.bookmarked_paper_ids:
-            candidates.pop(mid, None)
+        # 이미 북마크한 논문 제외
+        for pid in profile.bookmarked_paper_ids:
+            candidates.pop(pid, None)
 
         return list(candidates.values())
