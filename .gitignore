@@ -1,0 +1,5 @@
+backend-secret/
+__pycache__/
+*.pyc
+.env
+.DS_Store
