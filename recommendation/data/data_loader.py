@@ -5,9 +5,10 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Dict, Any
 
 from bson import ObjectId
-from dotenv import load_dotenv
+from dotenv import load_dotenv        # ← dotenv는 이것만!
 from pymongo import MongoClient, DESCENDING
-from sshtunnel import SSHTunnelForwarder
+from sshtunnel import SSHTunnelForwarder   # ← sshtunnel에서 가져와야 함
+import paramiko
 
 from ..models.data_models import Paper, UserProfile
 from .preprocess import tokenize_keywords
@@ -58,7 +59,7 @@ def get_ssh_tunnel() -> SSHTunnelForwarder:
             ssh_username=SSH_USERNAME,
             ssh_pkey=pkey,
             # MongoDB는 EC2 내부에서 127.0.0.1:27017로 리스닝
-            remote_bind_address=("127.0.0.1", MONGODB_PORT),
+            remote_bind_address=(MONGODB_PRIVATE_IP, MONGODB_PORT),
             local_bind_address=("127.0.0.1", 0),  # 자동으로 사용 가능한 포트 할당
             allow_agent=False,  # SSH agent 사용 안함
             host_pkey_directories=[],  # 호스트 키 디렉토리 비활성화
@@ -82,7 +83,13 @@ class MongoDataLoader:
             local_port = tunnel.local_bind_port
             
             auth_source = os.getenv("MONGO_AUTH_SOURCE", "admin")
-            uri = f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}@127.0.0.1:{local_port}/?authSource={auth_source}&directConnection=true"
+            uri = (
+                f"mongodb://{MONGODB_USERNAME}:{MONGODB_PASSWORD}"
+                f"@127.0.0.1:{local_port}/"
+                f"?authSource={auth_source}"
+                f"&directConnection=true"
+                f"&readPreference=primary"
+            )            
             client = MongoClient(
                 uri,
                 serverSelectionTimeoutMS=30000,
@@ -115,9 +122,14 @@ class MongoDataLoader:
 
     @staticmethod
     def _doc_to_paper(doc: Dict[str, Any]) -> Paper:
+        # arxiv_id 가져오기
+        arxiv_id = doc.get("id")
+        if not arxiv_id:
+            arxiv_id = str(doc.get("_id"))  # fallback: DB의 primary key 사용
+
         return Paper(
             mongo_id=str(doc["_id"]),
-            arxiv_id=doc.get("id"),  # ★ 실제 DB는 arXiv ID 문자열
+            arxiv_id=arxiv_id,
             title=doc.get("title"),
             abstract=doc.get("abstract"),
             authors=doc.get("authors"),
@@ -131,11 +143,12 @@ class MongoDataLoader:
             embedding_vector=doc.get("embedding_vector"),
         )
 
+
     # ------------------------------------------------------
     # PAPER 조회 관련
     # ------------------------------------------------------
     def get_paper_by_arxiv_id(self, arxiv_id: str) -> Optional[Paper]:
-        doc = self.col_papers.find_one({"id": arxiv_id})
+        doc = self.col_papers.find_one({"_id": arxiv_id})
         return self._doc_to_paper(doc) if doc else None
 
     def get_recent_papers(self, limit: int = 200):
