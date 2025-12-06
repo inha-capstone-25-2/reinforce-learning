@@ -61,6 +61,7 @@ def get_user_recommendations_rl(
     user_id: int,
     limit: int = 10,
     candidate_k: int = 200,
+    base_paper_id: Optional[str] = None,
     log_exposure: bool = True,
     request_meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
@@ -68,8 +69,11 @@ def get_user_recommendations_rl(
     룰 + RL 하이브리드 추천 API
     - 프론트에서 /recommendations/hybrid 에 매핑해서 사용
     """
-    recs: List[RecommendationResult] = recommend_user_hybrid(
-        user_id=user_id, top_k=limit, candidate_k=candidate_k
+    recs= recommend_user_hybrid(
+        user_id=user_id,
+        top_k=limit,
+        candidate_k=candidate_k,
+        base_paper_id=base_paper_id,
     )
     results = recs
 

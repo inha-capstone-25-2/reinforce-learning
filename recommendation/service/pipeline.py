@@ -1,11 +1,11 @@
 from __future__ import annotations
-
-from typing import List
+from typing import List, Optional
 
 from ..data.data_loader import MongoDataLoader
-from ..models.data_models import RecommendationResult
-from ..rule_based.rule_based_recommender import RuleBasedRecommender
+from ..models.data_models import RecommendationResult, UserProfile
+from ..rule_based.rule_based_recommender import RuleBasedRecommender, compute_total_score
 from .reranker import RLBanditReranker
+from ..rule_based.rule_based_recommender import RuleBasedRecommender
 
 
 _loader: MongoDataLoader | None = None
@@ -38,6 +38,7 @@ def recommend_for_user_hybrid(
     user_id: int,
     top_k: int = 6,
     candidate_k: int = 100,
+    base_paper_id: Optional[str] = None,
 ) -> List[RecommendationResult]:
     """
     1) Rule-based로 candidate_k개 후보 생성
@@ -48,9 +49,10 @@ def recommend_for_user_hybrid(
     rl_reranker = _get_rl_reranker()
 
     # 1) Rule-based 후보 100개
-    candidates: List[RecommendationResult] = rule_rec.recommend_for_user(
+    candidates = rule_rec.recommend_for_user(
         user_id=user_id,
         top_k=candidate_k,
+        base_paper_id=base_paper_id,
     )
 
     if not candidates:
