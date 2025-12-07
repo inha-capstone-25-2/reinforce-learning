@@ -1,6 +1,5 @@
 from .interface.recommend import (
     recommend_user,
-    recommend_similar_papers,
     recommend_user_rl,
 )
 

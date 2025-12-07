@@ -19,7 +19,7 @@ def _get_loader() -> MongoDataLoader:
 
 
 # ------------------------------------------------------
-# ① 룰베이스 추천 API + 노출 로그 기록
+# 룰베이스 추천 API + 노출 로그 기록
 # ------------------------------------------------------
 def get_user_recommendations(
     user_id: int,
@@ -27,10 +27,8 @@ def get_user_recommendations(
     log_exposure: bool = True,
     request_meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    룰 베이스 추천 (기본 추천 API)
-    - 프론트에서 /recommendations/basic 같은 엔드포인트로 사용 가능
-    """
+    
+    #룰 베이스 추천 (기본 추천 API)
     recs = recommend_user(user_id, top_k=limit)
     results = recs
 
@@ -55,7 +53,7 @@ def get_user_recommendations(
 
 
 # ------------------------------------------------------
-# ② 룰베이스 + RL 하이브리드 추천 API + 노출 로그 기록
+# 룰베이스 + RL 하이브리드 추천 API + 노출 로그 기록
 # ------------------------------------------------------
 def get_user_recommendations_rl(
     user_id: int,
@@ -65,10 +63,8 @@ def get_user_recommendations_rl(
     log_exposure: bool = True,
     request_meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    룰 + RL 하이브리드 추천 API
-    - 프론트에서 /recommendations/hybrid 에 매핑해서 사용
-    """
+    
+    #룰 + RL 하이브리드 추천 API
     recs= recommend_user_hybrid(
         user_id=user_id,
         top_k=limit,
@@ -98,8 +94,7 @@ def get_user_recommendations_rl(
 
 
 # ------------------------------------------------------
-# ③ 클릭 / 북마크 등의 상호작용 로그 API
-#    → 프론트에서 별도 엔드포인트로 호출
+# 클릭 / 북마크 등의 상호작용 로그 API→ 프론트에서 별도 엔드포인트로 호출
 # ------------------------------------------------------
 def log_recommendation_interaction(
     user_id: int,
@@ -110,22 +105,6 @@ def log_recommendation_interaction(
     dwell_time: Optional[float] = None,
     meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    프론트에서 클릭/북마크 발생 시 백엔드에서 호출할 함수.
-
-    예) FastAPI 기준:
-        @post("/recommendations/interactions")
-        def log_interaction(req: InteractionRequest):
-            return log_recommendation_interaction(
-                user_id=req.user_id,
-                paper_id=req.paper_id,
-                action_type=req.action_type,
-                recommendation_id=req.recommendation_id,
-                position=req.position,
-                dwell_time=req.dwell_time,
-                meta=req.meta,
-            )
-    """
     loader = _get_loader()
 
     # reward 계산에 필요한 최소 필드만 모아 전달

@@ -35,16 +35,6 @@ def train_offline_bandit(
     """
     MongoDB paper_recommendations 데이터를 사용하여
     SimpleBanditModel을 offline 학습하고, model_path에 저장한다.
-
-    Args:
-        model_path: 저장 경로. None 이면 DEFAULT_MODEL_PATH 사용.
-        batch_size: 학습 배치 크기
-        num_epochs: epoch 횟수
-        lr: learning rate
-        limit: 학습에 사용할 최대 샘플 수 (None 이면 전체)
-
-    Returns:
-        저장된 모델 파일 경로
     """
     model_path = Path(model_path or DEFAULT_MODEL_PATH)
 
@@ -99,6 +89,4 @@ def train_offline_bandit(
 
 if __name__ == "__main__":
     # 예시 실행:
-    # 프로젝트 루트에서:
-    #   python -m recommendation.rl.trainer.train_offline
     train_offline_bandit()

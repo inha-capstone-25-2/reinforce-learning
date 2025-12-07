@@ -5,7 +5,7 @@ from typing import Dict, Tuple, Set
 from ..models.data_models import Paper, UserProfile
 from ..data.preprocess import tokenize_keywords
 
-# --- Weight Definitions ---
+# Weight Definitions
 W_EXPLICIT_CAT = 0.50
 W_BOOKMARK_CAT = 0.30
 W_BOOKMARK_KW = 0.35
@@ -14,18 +14,12 @@ W_POPULARITY = 0.05 # 낮춤
 W_RECENCY = 0.05 #낮춤
 
 
-# ---------------------- Keyword Score ----------------------
+# Keyword Score 
 
 def _keyword_score(paper: Paper, profile: UserProfile) -> float:
-    """
-    Weighted keyword matching:
-      - bookmark keywords (strong)
-      - search keywords (weak)
-    """
-    # paper keywords
+    
     paper_kw: Set[str] = set(k.lower() for k in paper.keywords)
 
-    # Also add keywords from title/abstract tokenization
     if paper.title:
         paper_kw.update(tokenize_keywords(paper.title))
     if paper.abstract:
@@ -34,47 +28,32 @@ def _keyword_score(paper: Paper, profile: UserProfile) -> float:
     if not paper_kw:
         return 0.0
 
-    # Profile keywords come from:
-    # - bookmarks  → strong
-    # - search queries → weak
-    # But UserProfile stores them combined,
-    # so we separate them manually:
-
     bookmark_kw = set()
     search_kw = set()
 
-    # bookmark papers contain stronger keyword signals
     for p_kw in profile.bookmarked_paper_ids:
         # NOTE: keywords in Paper level parsed separately
         pass  # bookmark keywords already added via interests_keywords
 
-    # Split based on search_queries
     for q in profile.search_queries:
         search_kw.update(tokenize_keywords(q))
 
-    # The rest of profile.interests_keywords are assumed to be from bookmarks
     all_profile_kw = set(profile.interests_keywords)
     bookmark_kw = all_profile_kw - search_kw
 
-    # compute overlaps
     overlap_bookmark = len(bookmark_kw & paper_kw) / len(bookmark_kw) if bookmark_kw else 0.0
     overlap_search = len(search_kw & paper_kw) / len(search_kw) if search_kw else 0.0
 
-    # weighted sum
+    # 가중치 합산
     score = (W_BOOKMARK_KW * overlap_bookmark +
              W_SEARCH_KW * overlap_search)
 
     return min(score, 1.0)
 
 
-# ---------------------- Category Score ----------------------
+# Category Score 
 
 def _category_score(paper: Paper, profile: UserProfile) -> float:
-    """
-    Category score considers:
-      - PostgreSQL explicit categories → strong (0.5)
-      - bookmark categories → medium (0.3)
-    """
     paper_cats = set(paper.categories)
 
     explicit = set(profile.explicit_categories or [])
@@ -88,7 +67,7 @@ def _category_score(paper: Paper, profile: UserProfile) -> float:
     return min(W_EXPLICIT_CAT * s_explicit + W_BOOKMARK_CAT * s_bookmark, 1.0)
 
 
-# ---------------------- Popularity Score ----------------------
+# Popularity Score 
 
 def _popularity_score(paper: Paper) -> float:
     b = max(paper.bookmark_count, 0)
@@ -96,7 +75,7 @@ def _popularity_score(paper: Paper) -> float:
     return (log1p(b) + log1p(v)) / 2.0
 
 
-# ---------------------- Recency Score ----------------------
+# Recency Score 
 
 def _recency_score(paper: Paper, now: datetime) -> float:
     if not paper.update_date:
@@ -105,7 +84,7 @@ def _recency_score(paper: Paper, now: datetime) -> float:
     return 0.5 ** (days / 730.0)  # half-life ~2 years
 
 
-# ---------------------- Total Score ----------------------
+# Total Score
 
 def compute_total_score(paper: Paper, profile: UserProfile,
                         now: datetime = None) -> Tuple[float, Dict[str, float]]:

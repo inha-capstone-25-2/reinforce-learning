@@ -8,13 +8,13 @@ import os
 import json
 
 # --------------------------
-# 1. MongoDB 설정
+#  MongoDB 설정
 # --------------------------
 MONGO_URI = "mongodb://localhost:27017"
 DB_NAME = "recommendation_db"
 
 # --------------------------
-# 2. Bandit Policy 모델 정의 (기존과 동일)
+# Bandit Policy 모델 정의
 # --------------------------
 class BanditPolicy(nn.Module):
     def __init__(self, input_dim=5, hidden_dim=32):
@@ -30,7 +30,7 @@ class BanditPolicy(nn.Module):
 
 
 # --------------------------
-# 3. MongoDB에서 로그 가져오기 (JOIN 포함)
+# MongoDB에서 로그 가져오기 (JOIN 포함)
 # --------------------------
 def load_logs_from_mongo():
     client = MongoClient(MONGO_URI)
@@ -65,7 +65,7 @@ def load_logs_from_mongo():
 
 
 # --------------------------
-# 4. feature → tensor 변환
+# feature → tensor 변환
 # --------------------------
 def convert_to_tensor(samples):
     X = []
@@ -89,7 +89,7 @@ def convert_to_tensor(samples):
 
 
 # --------------------------
-# 5. 모델 학습
+# 모델 학습
 # --------------------------
 def train_model(X, y, epochs=100, lr=1e-3):
     model = BanditPolicy(input_dim=5)
@@ -110,7 +110,7 @@ def train_model(X, y, epochs=100, lr=1e-3):
 
 
 # --------------------------
-# 6. 모델 저장
+# 모델 저장
 # --------------------------
 def save_model(model):
     os.makedirs("models/rl", exist_ok=True)
@@ -120,7 +120,7 @@ def save_model(model):
 
 
 # --------------------------
-# 7. 실행 메인 함수
+# 실행 메인 함수
 # --------------------------
 if __name__ == "__main__":
     print("🚀 RL Training Start")
