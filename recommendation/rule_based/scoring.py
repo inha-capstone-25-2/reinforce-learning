@@ -10,8 +10,8 @@ W_EXPLICIT_CAT = 0.50
 W_BOOKMARK_CAT = 0.30
 W_BOOKMARK_KW = 0.35
 W_SEARCH_KW = 0.15
-W_POPULARITY = 0.20
-W_RECENCY = 0.10
+W_POPULARITY = 0.05 # 낮춤
+W_RECENCY = 0.05 #낮춤
 
 
 # ---------------------- Keyword Score ----------------------
