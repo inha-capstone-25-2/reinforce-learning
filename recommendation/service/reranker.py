@@ -126,11 +126,38 @@ class RLBanditReranker:
             c.features = dict(c.features or {})
             c.features["rule_score"] = float(rule_score)
             c.features["rl_score"] = float(rl_s)
-            c.score = float(rl_s)
+            final_score = 0.6 * rl_s + 0.4 * rule_score
+            c.score = final_score
             reranked.append(c)
 
-        # 5) RL 점수 기준 내림차순 정렬 후 top_k
+        # 5) RL 점수 기준 내림차순 정렬 후 top_k 
         reranked.sort(key=lambda r: r.score, reverse=True)
-        
-        logger.info(f"[RL Reranker] 📤 Reranking 완료: {len(reranked[:top_k])}개 반환")
-        return reranked[:top_k]
+
+        # 다양성이 너무 없는 관계로 수정!
+        final: List[RecommendationResult] = []
+        used_categories = set()
+
+        """
+        이미 선택된 것들과 카테고리가 겹치면 패널티 (또는 스킵)
+        너무 빡세게 스킵하면 추천이 비어버릴 수 있으니까 가능하면
+        다른 카테고리 우선으로 구성. 왜냐면 후보군에서 추천된걸 rerank하는거라
+        """
+        for cand in reranked:
+            cats = set(getattr(cand.paper, "categories", []) or [])
+            if used_categories and cats & used_categories and len(final) >= 3:#앞쪽 3개는 그냥 두고 이후부터는 겹치는 건 한 번 건너뛰는 식
+                continue
+
+            final.append(cand)
+            used_categories.update(cats)
+            if len(final) >= top_k:
+                break
+
+        if len(final) < top_k:
+            for cand in reranked:
+                if cand in final:
+                    continue
+                final.append(cand)
+                if len(final) >= top_k:
+                    break  
+
+        return final[:top_k]

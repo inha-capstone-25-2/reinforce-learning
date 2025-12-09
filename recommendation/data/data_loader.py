@@ -41,12 +41,12 @@ MONGODB_USERNAME = os.getenv("MONGO_USER")
 MONGODB_PASSWORD = os.getenv("MONGO_PASSWORD")
 MONGODB_DB_NAME = os.getenv("MONGO_DB", "arxiv")
 
-# 전역 SSH 터널 (싱글톤 패턴으로 관리)
+# 전역 SSH 터널
 _ssh_tunnel: Optional[SSHTunnelForwarder] = None
 
 
 def get_ssh_tunnel() -> SSHTunnelForwarder:
-    """SSH 터널을 싱글톤으로 가져오거나 생성합니다."""
+    #SSH 터널을 가져오거나 생성
     import paramiko
 
     global _ssh_tunnel
@@ -75,7 +75,7 @@ class MongoDataLoader:
 
     def __init__(self, client: Optional[MongoClient] = None, db_name: str = None):
         # -----------------------------
-        # 실제 MongoDB 연결 (SSH 터널링 기반)
+        # MongoDB 연결
         # -----------------------------
         if client is None:
             # SSH 터널 설정
@@ -97,13 +97,12 @@ class MongoDataLoader:
         self.client = client
         self.db = self.client[db_name or MONGODB_DB_NAME]
 
-        # Collections
+        # 컬렉션
         self.col_papers = self.db["papers"]
         self.col_bookmarks = self.db["bookmarks"]
         self.col_search_history = self.db["search_history"]
         self.col_user_activities = self.db["user_activities"]
-
-        # 🔹 추천 로그 컬렉션
+        # + 추천 로그 컬렉션
         self.col_reco_events = self.db["recommendation_events"]
         self.col_reco_interactions = self.db["recommendation_interactions"]
 
@@ -125,7 +124,7 @@ class MongoDataLoader:
     def _doc_to_paper(doc: Dict[str, Any]) -> Paper:
         return Paper(
             mongo_id=str(doc["_id"]),
-            arxiv_id=doc.get("_id"),  # ★ 실제 DB는 arXiv ID 문자열이 _id 에 들어있음
+            arxiv_id=doc.get("_id"),
             title=doc.get("title"),
             abstract=doc.get("abstract"),
             authors=doc.get("authors"),
@@ -237,7 +236,7 @@ class MongoDataLoader:
         return list(candidates.values())
 
     # ------------------------------------------------------
-    # 🔹 추천 노출 로그 저장
+    # 추천 노출 로그 저장
     # ------------------------------------------------------
     def log_recommendation_event(
         self,
@@ -277,7 +276,7 @@ class MongoDataLoader:
         return recommendation_id
 
     # ------------------------------------------------------
-    # 🔹 클릭/북마크 등 상호작용 로그 저장
+    # 클릭/북마크 등 상호작용 로그 저장
     # ------------------------------------------------------
     def log_interaction(
         self,
@@ -290,9 +289,9 @@ class MongoDataLoader:
         reward: Optional[float] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> str:
-        """
-        사용자의 클릭/북마크/닫기 등 상호작용을 기록.
-        """
+        
+        #사용자의 클릭/북마크/닫기 등 상호작용을 기록.
+        
         interaction_id = str(uuid4())
         now = datetime.utcnow()
 

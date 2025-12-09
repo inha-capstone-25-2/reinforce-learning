@@ -40,16 +40,6 @@ class RecommendationResult:
     features: Dict[str, float]
 
     def to_frontend_dict(self) -> Dict[str, Any]:
-        """
-        프론트엔드 요구사항에 맞춘 응답 포맷으로 변환.
-
-        - id: 논문 ID (arxiv_id 우선, 없으면 mongo_id)
-        - title, authors, abstract, categories
-        - summary: 요약(영어/한글 중 하나, 실제 구현에 따라 조정 가능)
-        - externalUrl: arXiv 원문 링크 (가능한 경우)
-        - score: 추천 점수
-        - features: 서브 스코어(카테고리, 키워드, 인기도, 최신성 등)
-        """
         paper_id = self.paper.arxiv_id or self.paper.mongo_id
         return {
             "id": paper_id,

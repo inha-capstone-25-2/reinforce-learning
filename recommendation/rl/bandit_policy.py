@@ -10,7 +10,6 @@ try:
     import torch
     import torch.nn as nn
 except ImportError:
-    # RL을 사용하지 않는 환경에서도 코드가 죽지 않도록 방어
     torch = None
     nn = None
 
@@ -41,14 +40,6 @@ class SimpleBanditModel(nn.Module if nn is not None else object):
         # x: (N, D)
         return self.linear(x).squeeze(-1)  # (N,)
 
-'''
-실제 학습(trainer) 파트는 별도 스크립트에서 SimpleBanditModel을 학습하고
-torch.save(model.state_dict(), "models/rl/bandit_policy_latest.pt") 로 저장하면 됨
-
-일단은
-inference + fallback까지 완전히 동작하도록만 구현함.
-'''
-
 
 class BanditPolicy:
     """
@@ -67,9 +58,6 @@ class BanditPolicy:
         self._loaded = False
 
     def load(self, input_dim: int) -> None:
-        """
-        모델 로딩. 파일이 없거나 PyTorch가 없으면 fallback 모드로 동작.
-        """
         if self._loaded:
             return
 

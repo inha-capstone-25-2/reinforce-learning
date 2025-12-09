@@ -17,13 +17,36 @@ def _get_recommender() -> RuleBasedRecommender:
 
 
 def recommend_user(user_id: int, top_k: int = 6) -> List[Dict[str, Any]]:
-    rec = _get_recommender().recommend_for_user(user_id, top_k)
+    """
+    기존 recommend_for_user를 호출하던 부분을
+    단일 recommend() 함수만 호출하도록 수정.
+    """
+    rec = _get_recommender().recommend(
+        user_id=user_id,
+        paper_id=None,# 유저 기반 추천
+        top_k=top_k,
+        candidate_k=top_k # 굳이 많은 후보 필요 없음
+    )
     return [r.to_frontend_dict() for r in rec]
 
-def recommend_similar_papers(paper_id: str, top_k: int = 6):
-    rec = _get_recommender().recommend_similar_papers(paper_id, top_k)
-    return [r.to_frontend_dict() for r in rec]
 
+def recommend_similar_papers(
+    paper_id: str,
+    top_k: int = 6,
+    user_id: Optional[int] = None,
+) -> List[Dict[str, Any]]:
+    """
+    기존 recommend_similar_papers도 단일 recommend() 기반으로 통합.
+    user_id가 있으면 유저 관심도 반영 + 상세페이지 논문 기반
+    user_id 없으면 순수 논문 기반 유사 논문 추천
+    """
+    rec = _get_recommender().recommend(
+        user_id=user_id,      
+        paper_id=paper_id,   
+        top_k=top_k,
+        candidate_k=300
+    )
+    return [r.to_frontend_dict() for r in rec]
 
 def recommend_user_hybrid(user_id: int, top_k: int = 6, candidate_k: int = 100, base_paper_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """

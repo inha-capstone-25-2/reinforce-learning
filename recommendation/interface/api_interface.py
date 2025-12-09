@@ -22,7 +22,7 @@ def _get_loader() -> MongoDataLoader:
 
 
 # ------------------------------------------------------
-# ① 룰베이스 추천 API + 노출 로그 기록
+# 룰베이스 추천 API + 노출 로그 기록
 # ------------------------------------------------------
 def get_user_recommendations(
     user_id: int,
@@ -30,10 +30,8 @@ def get_user_recommendations(
     log_exposure: bool = True,
     request_meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    룰 베이스 추천 (기본 추천 API)
-    - 프론트에서 /recommendations/basic 같은 엔드포인트로 사용 가능
-    """
+    
+    #룰 베이스 추천 (기본 추천 API)
     recs = recommend_user(user_id, top_k=limit)
     results = recs
 
@@ -74,6 +72,7 @@ def get_similar_paper_recommendations(paper_id: str, limit: int = 6) -> Dict[str
 
 # ------------------------------------------------------
 # ② 룰베이스 + RL 하이브리드 추천 API + 노출 로그 기록
+
 # ------------------------------------------------------
 def get_user_recommendations_rl(
     user_id: int,
@@ -83,10 +82,8 @@ def get_user_recommendations_rl(
     log_exposure: bool = True,
     request_meta: Optional[Dict[str, Any]] = None,
 ) -> Dict[str, Any]:
-    """
-    룰 + RL 하이브리드 추천 API
-    - 프론트에서 /recommendations/hybrid 에 매핑해서 사용
-    """
+    
+    #룰 + RL 하이브리드 추천 API
     recs= recommend_user_hybrid(
         user_id=user_id,
         top_k=limit,
@@ -116,8 +113,7 @@ def get_user_recommendations_rl(
 
 
 # ------------------------------------------------------
-# ③ 클릭 / 북마크 등의 상호작용 로그 API
-#    → 프론트에서 별도 엔드포인트로 호출
+# 클릭 / 북마크 등의 상호작용 로그 API→ 프론트에서 별도 엔드포인트로 호출
 # ------------------------------------------------------
 def log_recommendation_interaction(
     user_id: int,
