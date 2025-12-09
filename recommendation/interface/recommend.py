@@ -25,7 +25,7 @@ def recommend_similar_papers(paper_id: str, top_k: int = 6):
     return [r.to_frontend_dict() for r in rec]
 
 
-def recommend_user_hybrid(user_id: int, top_k: int = 6, candidate_k: int = 100) -> List[Dict[str, Any]]:
+def recommend_user_hybrid(user_id: int, top_k: int = 6, candidate_k: int = 100, base_paper_id: Optional[str] = None) -> List[Dict[str, Any]]:
     """
     Rule-based 100개 → RL reranking → 최종 top_k 개.
     프론트/백엔드가 RL 기반 추천을 쓰고 싶을 때 이 함수를 호출하면 된다.
@@ -34,5 +34,6 @@ def recommend_user_hybrid(user_id: int, top_k: int = 6, candidate_k: int = 100) 
         user_id=user_id,
         top_k=top_k,
         candidate_k=candidate_k,
+        base_paper_id=base_paper_id,
     )
     return [r.to_frontend_dict() for r in recs]

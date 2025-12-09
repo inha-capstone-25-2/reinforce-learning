@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import List, Optional
@@ -10,6 +11,8 @@ from ..data.data_loader import MongoDataLoader
 from ..models.data_models import RecommendationResult, UserProfile
 from ..rl.state_builder import build_candidate_features
 from ..rl.bandit_policy import SimpleBanditModel, DEFAULT_MODEL_PATH
+
+logger = logging.getLogger(__name__)
 
 try:
     import torch
@@ -38,19 +41,20 @@ class BanditPolicyWrapper:
 
         # torch 없는 환경이면 그대로 포기
         if torch is None:
-            print("[BanditPolicyWrapper] ⚠️ torch 가 설치되어 있지 않아 RL rerank를 비활성화합니다.")
+            logger.warning("[RL Reranker] ⚠️ torch 가 설치되어 있지 않아 RL rerank를 비활성화합니다.")
             return
 
         if not self.config.model_path.exists():
-            print(f"[BanditPolicyWrapper] ⚠️ RL 모델 파일이 없습니다: {self.config.model_path}")
+            logger.warning(f"[RL Reranker] ⚠️ RL 모델 파일이 없습니다: {self.config.model_path}")
             return
 
-        print(f"[BanditPolicyWrapper] RL 모델 로딩: {self.config.model_path} (input_dim={input_dim})")
+        logger.info(f"[RL Reranker] 🧠 RL 모델 로딩: {self.config.model_path} (input_dim={input_dim})")
         model = SimpleBanditModel(input_dim=input_dim)
         state = torch.load(self.config.model_path, map_location="cpu")
         model.load_state_dict(state)
         model.eval()
         self._model = model
+        logger.info("[RL Reranker] ✅ RL 모델 로딩 완료")
 
     def predict_scores(self, X: np.ndarray) -> Optional[np.ndarray]:
         """
@@ -67,6 +71,8 @@ class BanditPolicyWrapper:
         with torch.no_grad():
             t = torch.from_numpy(X).float()
             y = self._model(t).squeeze(-1).cpu().numpy()
+        
+        logger.info(f"[RL Reranker] 🎲 RL 점수 예측 완료: min={y.min():.4f}, max={y.max():.4f}, mean={y.mean():.4f}")
         return y
 
 
@@ -92,20 +98,25 @@ class RLBanditReranker:
         if not candidates:
             return []
 
+        logger.info(f"[RL Reranker] 📥 Reranking 시작: {len(candidates)}개 후보 → top {top_k}")
+
         # 1) UserProfile 로딩
         profile: UserProfile = self.loader.build_user_profile(user_id)
 
         # 2) 후보 논문들 feature matrix 생성
         papers = [c.paper for c in candidates]
         X, paper_ids, _feat_dicts = build_candidate_features(profile, papers)
+        logger.info(f"[RL Reranker] 📊 Feature matrix 생성: shape={X.shape}")
 
         # 3) RL 정책으로 점수 예측
         rl_scores = self.policy.predict_scores(X)
 
         # RL 사용 불가(troch 미설치, 모델 없음 등) → rule-based 순서 그대로 top_k
         if rl_scores is None:
-            print("[RLBanditReranker] RL 모델 사용 불가 → rule-based 결과 그대로 사용")
+            logger.warning("[RL Reranker] ⚠️ RL 모델 사용 불가 → rule-based 결과 그대로 사용")
             return candidates[:top_k]
+
+        logger.info("[RL Reranker] ✅ RL 모델 활성화 → RL 점수로 reranking")
 
         # 4) 후보들에 RL 점수 적용
         reranked: List[RecommendationResult] = []
@@ -120,4 +131,6 @@ class RLBanditReranker:
 
         # 5) RL 점수 기준 내림차순 정렬 후 top_k
         reranked.sort(key=lambda r: r.score, reverse=True)
+        
+        logger.info(f"[RL Reranker] 📤 Reranking 완료: {len(reranked[:top_k])}개 반환")
         return reranked[:top_k]
